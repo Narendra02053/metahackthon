@@ -21,6 +21,3 @@ dependencies = [
     "matplotlib",
     "requests"
 ]
-
-[tool.setuptools.packages.find]
-include = ["server*", "client*"]
