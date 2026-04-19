@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+astromind.egg-info/PKG-INFO
+astromind.egg-info/SOURCES.txt
+astromind.egg-info/dependency_links.txt
+astromind.egg-info/requires.txt
+astromind.egg-info/top_level.txt
+client/__init__.py
+client/astro_client.py
+server/__init__.py
+server/app.py
+server/astro_environment.py

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astromind"
+version = "0.1.0"
+description = "Mars Mission RL Environment built on OpenEnv for Meta PyTorch Hackathon"
+requires-python = ">=3.9"
+
+dependencies = [
+    "openenv-core",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "streamlit",
+    "numpy",
+    "torch",
+    "trl",
+    "transformers",
+    "matplotlib",
+    "requests"
+]
+
+[tool.setuptools.packages.find]
+include = ["server*", "client*"]
