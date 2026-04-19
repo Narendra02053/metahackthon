@@ -99,6 +99,10 @@ AstroMind follows the official OpenEnv specification:
 - **Client**: `AstroEnvClient` extends `HTTPEnvClient` from `openenv_core`
 - **Interface**: `reset()` → Observation, `step(action)` → Observation, `state` → dict
 
+## Training Results
+
+![Reward Curve](rewards.png)
+
 ## Hackathon Integration
 
 The rule-based agent in `train.py` serves as a baseline. Replace it with an LLM agent trained via TRL:
