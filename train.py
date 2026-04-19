@@ -13,15 +13,10 @@ Usage:
     2. Run training:     python train.py
 """
 
-import sys
-import os
 import random
 import math
 
 import matplotlib.pyplot as plt
-
-# Ensure the astromind package directory is on the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "astromind"))
 
 from client.astro_client import AstroEnvClient
 from models import AstroAction

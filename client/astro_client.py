@@ -12,7 +12,7 @@ import sys
 import os
 
 # Ensure the parent directory is on the path so models.py is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from openenv.core.env_client import EnvClient, StepResult
 from models import AstroAction, AstroObservation
