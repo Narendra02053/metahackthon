@@ -19,5 +19,7 @@ dependencies = [
     "trl",
     "transformers",
     "matplotlib",
-    "requests"
+    "requests",
+    "groq",
+    "python-dotenv"
 ]

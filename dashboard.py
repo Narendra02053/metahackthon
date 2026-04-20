@@ -27,6 +27,7 @@ from models import AstroAction
 # We import the function directly to avoid running training
 sys.path.insert(0, os.path.dirname(__file__))
 from train import select_action
+from llm_agent import get_llm_action
 
 
 def select_action_safe(obs):
@@ -252,7 +253,13 @@ with st.sidebar:
 # ── Auto Pilot Execution ──
 # When auto-pilot is enabled, select and execute the best action automatically
 if st.session_state.auto_pilot and not st.session_state.obs.observation.done:
-    action = select_action_safe(st.session_state.obs.observation)
+    # Use LLM agent in auto pilot mode
+    try:
+        action = get_llm_action(st.session_state.obs.observation)
+        st.sidebar.success(f"🤖 ARIA: {action}")
+    except:
+        action = select_action(st.session_state.obs.observation)
+        st.sidebar.warning("⚠️ Using fallback agent")
     send_action(action)
     time.sleep(0.5)
     st.rerun()
