@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 
 from client.astro_client import AstroEnvClient
 from models import AstroAction
+from llm_agent import get_llm_action
 
 BASE_URL = "ws://localhost:8000"
 
@@ -196,5 +197,70 @@ def run_training():
     print(f"Final avg reward: {moving_avg[-1]:.1f}")
 
 
+def run_llm_training():
+    """
+    Run training with LLM agent instead of rule-based agent.
+    The LLM reasons about mission state and decides actions.
+    """
+    rewards_per_episode = []
+    
+    print("=" * 70)
+    print(" 🤖 AstroMind — ARIA LLM Agent Training")
+    print("=" * 70)
+    
+    env = AstroEnvClient(base_url=BASE_URL).sync()
+    
+    NUM_LLM_EPISODES = 20  # LLM is slower, 20 is enough to show
+    
+    with env:
+        for episode in range(NUM_LLM_EPISODES):
+            obs = env.reset()
+            total_reward = 0.0
+            step = 0
+            
+            print(f"\n--- Episode {episode+1} ---")
+            
+            while not obs.observation.done:
+                # LLM decides the action
+                action = get_llm_action(obs.observation)
+                obs = env.step(AstroAction(command=action))
+                total_reward += obs.reward or 0
+                step += 1
+                
+                if step > 500:
+                    break
+            
+            rewards_per_episode.append(total_reward)
+            status = "✅ SUCCESS" if obs.observation.success else "❌ FAILED"
+            print(f"\nEpisode {episode+1}: {status} | "
+                  f"Reward: {total_reward:.1f} | "
+                  f"Phase: {obs.observation.phase} | "
+                  f"Steps: {step}")
+    
+    # Plot LLM reward curve
+    plt.figure(figsize=(12, 5))
+    plt.style.use('dark_background')
+    plt.plot(rewards_per_episode, 
+             color='cyan', linewidth=2, 
+             marker='o', markersize=6,
+             label='LLM Agent Reward')
+    plt.axhline(y=0, color='white', 
+                linestyle='--', alpha=0.3)
+    plt.title('AstroMind — ARIA LLM Agent Performance',
+              fontsize=14)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.legend()
+    plt.grid(True, alpha=0.2)
+    plt.tight_layout()
+    plt.savefig('llm_rewards.png', dpi=150,
+                facecolor='#0d0d0d')
+    plt.show()
+
+
 if __name__ == "__main__":
-    run_training()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "--llm":
+        run_llm_training()  # python train.py --llm
+    else:
+        run_training()      # python train.py
