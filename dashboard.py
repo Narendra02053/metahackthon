@@ -28,6 +28,15 @@ from models import AstroAction
 sys.path.insert(0, os.path.dirname(__file__))
 from train import select_action
 
+
+def select_action_safe(obs):
+    """Wrapper for select_action that prevents emergency_abort in auto-pilot mode."""
+    action = select_action(obs)
+    # Never allow emergency_abort in auto-pilot
+    if action == "emergency_abort":
+        return "run_diagnostics"  # Safe fallback
+    return action
+
 # ── Configuration ──
 BASE_URL = "ws://localhost:8000"
 
@@ -243,9 +252,15 @@ with st.sidebar:
 # ── Auto Pilot Execution ──
 # When auto-pilot is enabled, select and execute the best action automatically
 if st.session_state.auto_pilot and not st.session_state.obs.observation.done:
-    action = select_action(st.session_state.obs.observation)
+    action = select_action_safe(st.session_state.obs.observation)
     send_action(action)
     time.sleep(0.5)
+    st.rerun()
+
+# Auto-reset after 2 seconds if mission failed
+if st.session_state.auto_pilot and st.session_state.obs.observation.done and not st.session_state.obs.observation.success:
+    time.sleep(2)
+    reset_mission()
     st.rerun()
 
 # ── Main Panel ──
