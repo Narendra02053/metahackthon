@@ -196,6 +196,26 @@ def init_session_state():
     if "total_reward" not in st.session_state:
         st.session_state.total_reward = 0.0
 
+    # Initialize UI placeholders to prevent recreation
+    if "fuel_bar" not in st.session_state:
+        st.session_state.fuel_bar = None
+    if "oxygen_bar" not in st.session_state:
+        st.session_state.oxygen_bar = None
+    if "power_bar" not in st.session_state:
+        st.session_state.power_bar = None
+    if "hull_bar" not in st.session_state:
+        st.session_state.hull_bar = None
+    if "solar_placeholder" not in st.session_state:
+        st.session_state.solar_placeholder = None
+    if "meteor_placeholder" not in st.session_state:
+        st.session_state.meteor_placeholder = None
+    if "comm_placeholder" not in st.session_state:
+        st.session_state.comm_placeholder = None
+    if "last_reward_placeholder" not in st.session_state:
+        st.session_state.last_reward_placeholder = None
+    if "total_reward_placeholder" not in st.session_state:
+        st.session_state.total_reward_placeholder = None
+
 
 def send_action(command: str):
     """Send an action to the environment and update session state.
@@ -385,53 +405,62 @@ else:
     with col2:
         st.subheader("🔋 Resources")
 
-        # Create placeholders for progress bars
-        fuel_placeholder = st.empty()
-        oxygen_placeholder = st.empty()
-        power_placeholder = st.empty()
-        hull_placeholder = st.empty()
+        # Create placeholders only if they don't exist
+        if st.session_state.fuel_bar is None:
+            st.session_state.fuel_bar = st.empty()
+        if st.session_state.oxygen_bar is None:
+            st.session_state.oxygen_bar = st.empty()
+        if st.session_state.power_bar is None:
+            st.session_state.power_bar = st.empty()
+        if st.session_state.hull_bar is None:
+            st.session_state.hull_bar = st.empty()
 
         # Update progress bars using session state values
         fuel_color = "🔴" if st.session_state.fuel < 20 else "🟡" if st.session_state.fuel < 50 else "🟢"
-        fuel_placeholder.progress(st.session_state.fuel / 100.0, text=f"{fuel_color} Fuel: {st.session_state.fuel:.1f}%")
+        st.session_state.fuel_bar.progress(st.session_state.fuel / 100.0, text=f"{fuel_color} Fuel: {st.session_state.fuel:.1f}%")
 
         oxy_color = "🔴" if st.session_state.oxygen < 20 else "🟡" if st.session_state.oxygen < 50 else "🟢"
-        oxygen_placeholder.progress(st.session_state.oxygen / 100.0, text=f"{oxy_color} Oxygen: {st.session_state.oxygen:.1f}%")
+        st.session_state.oxygen_bar.progress(st.session_state.oxygen / 100.0, text=f"{oxy_color} Oxygen: {st.session_state.oxygen:.1f}%")
 
         pwr_color = "🔴" if st.session_state.power < 15 else "🟡" if st.session_state.power < 30 else "🟢"
-        power_placeholder.progress(st.session_state.power / 100.0, text=f"{pwr_color} Power: {st.session_state.power:.1f}%")
+        st.session_state.power_bar.progress(st.session_state.power / 100.0, text=f"{pwr_color} Power: {st.session_state.power:.1f}%")
 
         hull_color = "🔴" if st.session_state.hull < 30 else "🟡" if st.session_state.hull < 60 else "🟢"
-        hull_placeholder.progress(st.session_state.hull / 100.0, text=f"{hull_color} Hull: {st.session_state.hull:.1f}%")
+        st.session_state.hull_bar.progress(st.session_state.hull / 100.0, text=f"{hull_color} Hull: {st.session_state.hull:.1f}%")
 
     # ── Column 3: Events ──
     with col3:
         st.subheader("⚡ Events")
 
-        # Create placeholders for events section
-        solar_placeholder = st.empty()
-        meteor_placeholder = st.empty()
-        comm_placeholder = st.empty()
-        last_reward_placeholder = st.empty()
-        total_reward_placeholder = st.empty()
+        # Create placeholders only if they don't exist
+        if st.session_state.solar_placeholder is None:
+            st.session_state.solar_placeholder = st.empty()
+        if st.session_state.meteor_placeholder is None:
+            st.session_state.meteor_placeholder = st.empty()
+        if st.session_state.comm_placeholder is None:
+            st.session_state.comm_placeholder = st.empty()
+        if st.session_state.last_reward_placeholder is None:
+            st.session_state.last_reward_placeholder = st.empty()
+        if st.session_state.total_reward_placeholder is None:
+            st.session_state.total_reward_placeholder = st.empty()
 
         # Update events using session state values
         if obs_data.solar_storm_active:
-            solar_placeholder.markdown('<p class="warning-text">☀️ SOLAR STORM ACTIVE!</p>', unsafe_allow_html=True)
+            st.session_state.solar_placeholder.markdown('<p class="warning-text">☀️ SOLAR STORM ACTIVE!</p>', unsafe_allow_html=True)
         else:
-            solar_placeholder.markdown("☀️ Solar Storm: **Clear**")
+            st.session_state.solar_placeholder.markdown("☀️ Solar Storm: **Clear**")
 
         if obs_data.micrometeorite_hit:
-            meteor_placeholder.markdown("☄️ Micrometeorite: **IMPACT!**")
+            st.session_state.meteor_placeholder.markdown("☄️ Micrometeorite: **IMPACT!**")
         else:
-            meteor_placeholder.markdown("☄️ Micrometeorite: **None**")
+            st.session_state.meteor_placeholder.markdown("☄️ Micrometeorite: **None**")
 
-        comm_placeholder.metric("Comm Delay", f"{obs_data.communication_delay}s")
+        st.session_state.comm_placeholder.metric("Comm Delay", f"{obs_data.communication_delay}s")
 
         reward_color = "🟢" if st.session_state.last_reward > 0 else "🔴" if st.session_state.last_reward < 0 else "⚪"
-        last_reward_placeholder.metric("Last Reward", f"{reward_color} {st.session_state.last_reward:.1f}")
+        st.session_state.last_reward_placeholder.metric("Last Reward", f"{reward_color} {st.session_state.last_reward:.1f}")
 
-        total_reward_placeholder.metric("Total Reward", f"{st.session_state.total_reward:.1f}")
+        st.session_state.total_reward_placeholder.metric("Total Reward", f"{st.session_state.total_reward:.1f}")
 
     # ── Bottom Section ──
     st.markdown("---")
