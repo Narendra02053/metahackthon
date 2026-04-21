@@ -247,7 +247,6 @@ with st.sidebar:
     for command, emoji, label in ACTION_BUTTONS:
         if st.button(f"{emoji} {label}", key=f"btn_{command}"):
             send_action(command)
-            st.rerun()
 
     st.markdown("---")
 
@@ -259,13 +258,11 @@ with st.sidebar:
             st.session_state.mission_log.append("🤖 Auto Pilot ENGAGED")
         else:
             st.session_state.mission_log.append("🤖 Auto Pilot DISENGAGED")
-        st.rerun()
 
     # Reset Mission button
     st.markdown("---")
     if st.button("🔄 Reset Mission", key="btn_reset"):
         reset_mission()
-        st.rerun()
 
     # Auto pilot status indicator
     if st.session_state.auto_pilot:
