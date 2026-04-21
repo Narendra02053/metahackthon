@@ -17,6 +17,7 @@ Usage:
 import sys
 import os
 import time
+import matplotlib.pyplot as plt
 
 import streamlit as st
 
@@ -161,6 +162,9 @@ def init_session_state():
     if "rewards" not in st.session_state:
         st.session_state.rewards = []
 
+    if "reward_history" not in st.session_state:
+        st.session_state.reward_history = []
+
     if "auto_pilot" not in st.session_state:
         st.session_state.auto_pilot = False
 
@@ -175,17 +179,21 @@ def send_action(command: str):
         obs = st.session_state.env.step(AstroAction(command=command))
         st.session_state.obs = obs
 
-        # Log the action and result
+        # Log the action and result with detailed resource info
         log_entry = (
             f"Day {obs.observation.mission_day:3d} | "
             f"{command:20s} | "
             f"Reward: {obs.reward:6.1f} | "
-            f"{obs.observation.message}"
+            f"Fuel: {obs.observation.fuel:.1f}% | "
+            f"Oxygen: {obs.observation.oxygen:.1f}% | "
+            f"Power: {obs.observation.power:.1f}% | "
+            f"Hull: {obs.observation.hull_integrity:.1f}%"
         )
         st.session_state.mission_log.append(log_entry)
 
         # Track rewards for the chart
         st.session_state.rewards.append(obs.reward or 0)
+        st.session_state.reward_history.append(obs.reward or 0)
 
         # If episode ended, log it
         if obs.observation.done:
@@ -194,8 +202,18 @@ def send_action(command: str):
                     "🎉 ═══════ MISSION SUCCESS ═══════ 🎉"
                 )
             else:
+                # Determine failure reason
+                failure_reason = "Unknown"
+                if obs.observation.fuel <= 0:
+                    failure_reason = "Fuel Depleted"
+                elif obs.observation.oxygen <= 0:
+                    failure_reason = "Oxygen Depleted"
+                elif obs.observation.power <= 0:
+                    failure_reason = "Power Depleted"
+                elif obs.observation.hull_integrity <= 0:
+                    failure_reason = "Hull Destroyed"
                 st.session_state.mission_log.append(
-                    "💀 ═══════ MISSION FAILED ═══════ 💀"
+                    f"💀 ═══════ MISSION FAILED ({failure_reason}) ═══════ 💀"
                 )
     except Exception as e:
         st.session_state.mission_log.append(f"ERROR: {e}")
@@ -209,6 +227,7 @@ def reset_mission():
             "Mission reset. Awaiting launch sequence..."
         ]
         st.session_state.rewards = []
+        st.session_state.reward_history = []
     except Exception as e:
         st.session_state.mission_log.append(f"RESET ERROR: {e}")
 
@@ -253,15 +272,22 @@ with st.sidebar:
 # ── Auto Pilot Execution ──
 # When auto-pilot is enabled, select and execute the best action automatically
 if st.session_state.auto_pilot and not st.session_state.obs.observation.done:
-    # Use LLM agent in auto pilot mode
-    try:
-        action = get_llm_action(st.session_state.obs.observation)
-        st.sidebar.success(f"🤖 ARIA: {action}")
-    except:
-        action = select_action(st.session_state.obs.observation)
-        st.sidebar.warning("⚠️ Using fallback agent")
-    send_action(action)
-    time.sleep(0.5)
+    st.sidebar.info("🤖 Auto Pilot running 50 steps...")
+    
+    for step in range(50):
+        if st.session_state.obs.observation.done:
+            break
+        
+        # Use LLM agent in auto pilot mode
+        try:
+            action = get_llm_action(st.session_state.obs.observation)
+        except:
+            action = select_action(st.session_state.obs.observation)
+        
+        send_action(action)
+        time.sleep(0.2)
+    
+    st.sidebar.success("🤖 Auto Pilot completed")
     st.rerun()
 
 # Auto-reset after 2 seconds if mission failed
@@ -296,9 +322,19 @@ with col1:
     # Success/failure indicator
     if obs_data.done:
         if obs_data.success:
-            st.markdown('<p class="success-text">🎉 MISSION SUCCESS!</p>', unsafe_allow_html=True)
+            st.success("🎉 MISSION COMPLETED SUCCESSFULLY!")
         else:
-            st.markdown('<p class="warning-text">💀 MISSION FAILED</p>', unsafe_allow_html=True)
+            # Determine failure reason
+            if obs_data.fuel <= 0:
+                st.error("💀 MISSION FAILED: Fuel Depleted")
+            elif obs_data.oxygen <= 0:
+                st.error("💀 MISSION FAILED: Oxygen Depleted")
+            elif obs_data.power <= 0:
+                st.error("💀 MISSION FAILED: Power Depleted")
+            elif obs_data.hull_integrity <= 0:
+                st.error("💀 MISSION FAILED: Hull Destroyed")
+            else:
+                st.error("💀 MISSION FAILED")
 
 # ── Column 2: Resources ──
 with col2:
@@ -356,7 +392,20 @@ log_entries = st.session_state.mission_log[-15:]
 log_html = "<div class='log-container'>" + "<br>".join(log_entries) + "</div>"
 st.markdown(log_html, unsafe_allow_html=True)
 
-# Reward chart
-if st.session_state.rewards:
-    st.subheader("📈 Reward History")
-    st.line_chart(st.session_state.rewards, height=200)
+# Reward chart using matplotlib
+if st.session_state.reward_history:
+    st.subheader("📈 Reward Progress Over Time")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(st.session_state.reward_history, color='#00ff88', linewidth=2)
+    ax.set_xlabel('Steps', color='#e0e0e0')
+    ax.set_ylabel('Reward', color='#e0e0e0')
+    ax.set_title('Reward Progress Over Time', color='#e0e0e0')
+    ax.grid(True, alpha=0.3, color='#4444aa')
+    ax.tick_params(colors='#e0e0e0')
+    ax.spines['bottom'].set_color('#4444aa')
+    ax.spines['top'].set_color('#4444aa')
+    ax.spines['left'].set_color('#4444aa')
+    ax.spines['right'].set_color('#4444aa')
+    fig.patch.set_facecolor('#0a0a2e')
+    ax.set_facecolor('#0a0a2e')
+    st.pyplot(fig)
