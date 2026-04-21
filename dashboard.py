@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 import streamlit as st
 
-from client.astro_client import AstroEnvClient
+from server.astro_environment import AstroEnvironment
 from models import AstroAction
 
 # ── Import the rule-based agent for auto-pilot mode ──
@@ -38,9 +38,6 @@ def select_action_safe(obs):
     if action == "emergency_abort":
         return "run_diagnostics"  # Safe fallback
     return action
-
-# ── Configuration ──
-BASE_URL = "ws://localhost:8000"
 
 # Phase emoji mapping for visual display
 PHASE_EMOJIS = {
@@ -142,10 +139,9 @@ st.markdown("""
 
 
 def close_environment():
-    """Close the environment connection to free up server capacity."""
+    """Close the environment to free up resources."""
     if "env" in st.session_state:
         try:
-            st.session_state.env.__exit__(None, None, None)
             del st.session_state.env
         except Exception as e:
             print(f"Error closing environment: {e}")
@@ -153,29 +149,21 @@ def close_environment():
 
 def init_session_state():
     """Initialize Streamlit session state variables on first load."""
-    # Reuse existing environment instance if available
+    # Initialize environment directly (no WebSocket dependency)
     if "env" not in st.session_state:
         try:
-            st.session_state.env = AstroEnvClient(base_url=BASE_URL).sync()
-            st.session_state.env.__enter__()  # open the sync client context
+            st.session_state.env = AstroEnvironment()
         except Exception as e:
-            st.error(f"Could not create environment connection: {e}")
+            st.error(f"Could not initialize environment: {e}")
             st.stop()
 
-    # Reset observation (reuse existing connection)
+    # Reset observation
     if "obs" not in st.session_state:
         try:
             st.session_state.obs = st.session_state.env.reset()
         except Exception as e:
-            # If reset fails, try to close and recreate the connection
-            close_environment()
-            try:
-                st.session_state.env = AstroEnvClient(base_url=BASE_URL).sync()
-                st.session_state.env.__enter__()
-                st.session_state.obs = st.session_state.env.reset()
-            except Exception as e2:
-                st.error(f"Could not connect to server at {BASE_URL}: {e2}")
-                st.stop()
+            st.error(f"Could not reset environment: {e}")
+            st.stop()
 
     if "mission_log" not in st.session_state:
         st.session_state.mission_log = [
@@ -221,44 +209,44 @@ def send_action(command: str):
 
         # Log the action and result with detailed resource info
         log_entry = (
-            f"Day {obs.observation.mission_day:3d} | "
+            f"Day {obs.mission_day:3d} | "
             f"{command:20s} | "
             f"Reward: {obs.reward:6.1f} | "
-            f"Fuel: {obs.observation.fuel:.1f}% | "
-            f"Oxygen: {obs.observation.oxygen:.1f}% | "
-            f"Power: {obs.observation.power:.1f}% | "
-            f"Hull: {obs.observation.hull_integrity:.1f}%"
+            f"Fuel: {obs.fuel:.1f}% | "
+            f"Oxygen: {obs.oxygen:.1f}% | "
+            f"Power: {obs.power:.1f}% | "
+            f"Hull: {obs.hull_integrity:.1f}%"
         )
         st.session_state.mission_log.append(log_entry)
 
         # Store environment values in session state for stable UI updates
-        st.session_state.fuel = obs.observation.fuel
-        st.session_state.oxygen = obs.observation.oxygen
-        st.session_state.power = obs.observation.power
-        st.session_state.hull = obs.observation.hull_integrity
+        st.session_state.fuel = obs.fuel
+        st.session_state.oxygen = obs.oxygen
+        st.session_state.power = obs.power
+        st.session_state.hull = obs.hull_integrity
         st.session_state.last_reward = obs.reward or 0
-        st.session_state.total_reward = obs.observation.total_reward
+        st.session_state.total_reward = obs.total_reward
 
         # Track rewards for the chart
         st.session_state.rewards.append(obs.reward or 0)
         st.session_state.reward_history.append(obs.reward or 0)
 
         # If episode ended, log it
-        if obs.observation.done:
-            if obs.observation.success:
+        if obs.done:
+            if obs.success:
                 st.session_state.mission_log.append(
                     "🎉 ═══════ MISSION SUCCESS ═══════ 🎉"
                 )
             else:
                 # Determine failure reason
                 failure_reason = "Unknown"
-                if obs.observation.fuel <= 0:
+                if obs.fuel <= 0:
                     failure_reason = "Fuel Depleted"
-                elif obs.observation.oxygen <= 0:
+                elif obs.oxygen <= 0:
                     failure_reason = "Oxygen Depleted"
-                elif obs.observation.power <= 0:
+                elif obs.power <= 0:
                     failure_reason = "Power Depleted"
-                elif obs.observation.hull_integrity <= 0:
+                elif obs.hull_integrity <= 0:
                     failure_reason = "Hull Destroyed"
                 st.session_state.mission_log.append(
                     f"💀 ═══════ MISSION FAILED ({failure_reason}) ═══════ 💀"
@@ -276,6 +264,12 @@ def reset_mission():
         ]
         st.session_state.rewards = []
         st.session_state.reward_history = []
+        st.session_state.fuel = 100.0
+        st.session_state.oxygen = 100.0
+        st.session_state.power = 100.0
+        st.session_state.hull = 100.0
+        st.session_state.last_reward = 0.0
+        st.session_state.total_reward = 0.0
     except Exception as e:
         st.session_state.mission_log.append(f"RESET ERROR: {e}")
 
@@ -316,19 +310,19 @@ with st.sidebar:
 
 # ── Auto Pilot Execution ──
 # When auto-pilot is enabled, select and execute the best action automatically
-if st.session_state.auto_pilot and not st.session_state.obs.observation.done and not st.session_state.auto_pilot_running:
+if st.session_state.auto_pilot and not st.session_state.obs.done and not st.session_state.auto_pilot_running:
     st.session_state.auto_pilot_running = True
     st.sidebar.info("🤖 Auto Pilot running 50 steps...")
     
     for step in range(50):
-        if st.session_state.obs.observation.done:
+        if st.session_state.obs.done:
             break
         
         # Use LLM agent in auto pilot mode
         try:
-            action = get_llm_action(st.session_state.obs.observation)
+            action = get_llm_action(st.session_state.obs)
         except:
-            action = select_action(st.session_state.obs.observation)
+            action = select_action(st.session_state.obs)
         
         send_action(action)
         time.sleep(0.2)
@@ -338,7 +332,7 @@ if st.session_state.auto_pilot and not st.session_state.obs.observation.done and
     st.session_state.auto_pilot_running = False
 
 # Auto-reset after 2 seconds if mission failed
-if st.session_state.auto_pilot and st.session_state.obs.observation.done and not st.session_state.obs.observation.success:
+if st.session_state.auto_pilot and st.session_state.obs.done and not st.session_state.obs.success:
     time.sleep(2)
     reset_mission()
     st.session_state.auto_pilot = False  # Disable auto-pilot after reset
@@ -348,7 +342,7 @@ if st.session_state.auto_pilot and st.session_state.obs.observation.done and not
 if st.session_state.auto_pilot_running:
     st.info("🤖 Auto Pilot in progress... UI updates paused")
 else:
-    obs_data = st.session_state.obs.observation
+    obs_data = st.session_state.obs
 
     # Title bar
     st.title("🚀 AstroMind Mission Control")
