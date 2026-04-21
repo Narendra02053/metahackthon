@@ -288,13 +288,13 @@ if st.session_state.auto_pilot and not st.session_state.obs.observation.done:
         time.sleep(0.2)
     
     st.sidebar.success("🤖 Auto Pilot completed")
-    st.rerun()
+    st.session_state.auto_pilot = False  # Disable auto-pilot after completion
 
 # Auto-reset after 2 seconds if mission failed
 if st.session_state.auto_pilot and st.session_state.obs.observation.done and not st.session_state.obs.observation.success:
     time.sleep(2)
     reset_mission()
-    st.rerun()
+    st.session_state.auto_pilot = False  # Disable auto-pilot after reset
 
 # ── Main Panel ──
 obs_data = st.session_state.obs.observation
