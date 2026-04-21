@@ -171,6 +171,20 @@ def init_session_state():
     if "auto_pilot_running" not in st.session_state:
         st.session_state.auto_pilot_running = False
 
+    # Environment values for stable UI updates
+    if "fuel" not in st.session_state:
+        st.session_state.fuel = 100.0
+    if "oxygen" not in st.session_state:
+        st.session_state.oxygen = 100.0
+    if "power" not in st.session_state:
+        st.session_state.power = 100.0
+    if "hull" not in st.session_state:
+        st.session_state.hull = 100.0
+    if "last_reward" not in st.session_state:
+        st.session_state.last_reward = 0.0
+    if "total_reward" not in st.session_state:
+        st.session_state.total_reward = 0.0
+
 
 def send_action(command: str):
     """Send an action to the environment and update session state.
@@ -193,6 +207,14 @@ def send_action(command: str):
             f"Hull: {obs.observation.hull_integrity:.1f}%"
         )
         st.session_state.mission_log.append(log_entry)
+
+        # Store environment values in session state for stable UI updates
+        st.session_state.fuel = obs.observation.fuel
+        st.session_state.oxygen = obs.observation.oxygen
+        st.session_state.power = obs.observation.power
+        st.session_state.hull = obs.observation.hull_integrity
+        st.session_state.last_reward = obs.reward or 0
+        st.session_state.total_reward = obs.observation.total_reward
 
         # Track rewards for the chart
         st.session_state.rewards.append(obs.reward or 0)
@@ -346,48 +368,53 @@ else:
     with col2:
         st.subheader("🔋 Resources")
 
-        # Fuel gauge
-        fuel_color = "🔴" if obs_data.fuel < 20 else "🟡" if obs_data.fuel < 50 else "🟢"
-        st.progress(obs_data.fuel / 100.0, text=f"{fuel_color} Fuel: {obs_data.fuel:.1f}%")
+        # Create placeholders for progress bars
+        fuel_placeholder = st.empty()
+        oxygen_placeholder = st.empty()
+        power_placeholder = st.empty()
+        hull_placeholder = st.empty()
 
-        # Oxygen gauge
-        oxy_color = "🔴" if obs_data.oxygen < 20 else "🟡" if obs_data.oxygen < 50 else "🟢"
-        st.progress(obs_data.oxygen / 100.0, text=f"{oxy_color} Oxygen: {obs_data.oxygen:.1f}%")
+        # Update progress bars using session state values
+        fuel_color = "🔴" if st.session_state.fuel < 20 else "🟡" if st.session_state.fuel < 50 else "🟢"
+        fuel_placeholder.progress(st.session_state.fuel / 100.0, text=f"{fuel_color} Fuel: {st.session_state.fuel:.1f}%")
 
-        # Power gauge
-        pwr_color = "🔴" if obs_data.power < 15 else "🟡" if obs_data.power < 30 else "🟢"
-        st.progress(obs_data.power / 100.0, text=f"{pwr_color} Power: {obs_data.power:.1f}%")
+        oxy_color = "🔴" if st.session_state.oxygen < 20 else "🟡" if st.session_state.oxygen < 50 else "🟢"
+        oxygen_placeholder.progress(st.session_state.oxygen / 100.0, text=f"{oxy_color} Oxygen: {st.session_state.oxygen:.1f}%")
 
-        # Hull gauge
-        hull_color = "🔴" if obs_data.hull_integrity < 30 else "🟡" if obs_data.hull_integrity < 60 else "🟢"
-        st.progress(obs_data.hull_integrity / 100.0, text=f"{hull_color} Hull: {obs_data.hull_integrity:.1f}%")
+        pwr_color = "🔴" if st.session_state.power < 15 else "🟡" if st.session_state.power < 30 else "🟢"
+        power_placeholder.progress(st.session_state.power / 100.0, text=f"{pwr_color} Power: {st.session_state.power:.1f}%")
+
+        hull_color = "🔴" if st.session_state.hull < 30 else "🟡" if st.session_state.hull < 60 else "🟢"
+        hull_placeholder.progress(st.session_state.hull / 100.0, text=f"{hull_color} Hull: {st.session_state.hull:.1f}%")
 
     # ── Column 3: Events ──
     with col3:
         st.subheader("⚡ Events")
 
-        # Solar storm indicator
+        # Create placeholders for events section
+        solar_placeholder = st.empty()
+        meteor_placeholder = st.empty()
+        comm_placeholder = st.empty()
+        last_reward_placeholder = st.empty()
+        total_reward_placeholder = st.empty()
+
+        # Update events using session state values
         if obs_data.solar_storm_active:
-            st.markdown('<p class="warning-text">☀️ SOLAR STORM ACTIVE!</p>', unsafe_allow_html=True)
+            solar_placeholder.markdown('<p class="warning-text">☀️ SOLAR STORM ACTIVE!</p>', unsafe_allow_html=True)
         else:
-            st.markdown("☀️ Solar Storm: **Clear**")
+            solar_placeholder.markdown("☀️ Solar Storm: **Clear**")
 
-        # Micrometeorite indicator
         if obs_data.micrometeorite_hit:
-            st.markdown("☄️ Micrometeorite: **IMPACT!**")
+            meteor_placeholder.markdown("☄️ Micrometeorite: **IMPACT!**")
         else:
-            st.markdown("☄️ Micrometeorite: **None**")
+            meteor_placeholder.markdown("☄️ Micrometeorite: **None**")
 
-        # Communication delay
-        st.metric("Comm Delay", f"{obs_data.communication_delay}s")
+        comm_placeholder.metric("Comm Delay", f"{obs_data.communication_delay}s")
 
-        # Last reward
-        last_reward = st.session_state.rewards[-1] if st.session_state.rewards else 0.0
-        reward_color = "🟢" if last_reward > 0 else "🔴" if last_reward < 0 else "⚪"
-        st.metric("Last Reward", f"{reward_color} {last_reward:.1f}")
+        reward_color = "🟢" if st.session_state.last_reward > 0 else "🔴" if st.session_state.last_reward < 0 else "⚪"
+        last_reward_placeholder.metric("Last Reward", f"{reward_color} {st.session_state.last_reward:.1f}")
 
-        # Total reward
-        st.metric("Total Reward", f"{obs_data.total_reward:.1f}")
+        total_reward_placeholder.metric("Total Reward", f"{st.session_state.total_reward:.1f}")
 
     # ── Bottom Section ──
     st.markdown("---")
