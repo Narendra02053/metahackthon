@@ -168,6 +168,9 @@ def init_session_state():
     if "auto_pilot" not in st.session_state:
         st.session_state.auto_pilot = False
 
+    if "auto_pilot_running" not in st.session_state:
+        st.session_state.auto_pilot_running = False
+
 
 def send_action(command: str):
     """Send an action to the environment and update session state.
@@ -271,7 +274,8 @@ with st.sidebar:
 
 # ── Auto Pilot Execution ──
 # When auto-pilot is enabled, select and execute the best action automatically
-if st.session_state.auto_pilot and not st.session_state.obs.observation.done:
+if st.session_state.auto_pilot and not st.session_state.obs.observation.done and not st.session_state.auto_pilot_running:
+    st.session_state.auto_pilot_running = True
     st.sidebar.info("🤖 Auto Pilot running 50 steps...")
     
     for step in range(50):
@@ -289,6 +293,7 @@ if st.session_state.auto_pilot and not st.session_state.obs.observation.done:
     
     st.sidebar.success("🤖 Auto Pilot completed")
     st.session_state.auto_pilot = False  # Disable auto-pilot after completion
+    st.session_state.auto_pilot_running = False
 
 # Auto-reset after 2 seconds if mission failed
 if st.session_state.auto_pilot and st.session_state.obs.observation.done and not st.session_state.obs.observation.success:
@@ -297,115 +302,119 @@ if st.session_state.auto_pilot and st.session_state.obs.observation.done and not
     st.session_state.auto_pilot = False  # Disable auto-pilot after reset
 
 # ── Main Panel ──
-obs_data = st.session_state.obs.observation
+# If auto-pilot is running, show loading state
+if st.session_state.auto_pilot_running:
+    st.info("🤖 Auto Pilot in progress... UI updates paused")
+else:
+    obs_data = st.session_state.obs.observation
 
-# Title bar
-st.title("🚀 AstroMind Mission Control")
-st.caption("Mars Mission RL Environment — Meta × PyTorch × HuggingFace OpenEnv Hackathon")
+    # Title bar
+    st.title("🚀 AstroMind Mission Control")
+    st.caption("Mars Mission RL Environment — Meta × PyTorch × HuggingFace OpenEnv Hackathon")
 
-# ── Three-column layout ──
-col1, col2, col3 = st.columns(3)
+    # ── Three-column layout ──
+    col1, col2, col3 = st.columns(3)
 
-# ── Column 1: Mission Status ──
-with col1:
-    st.subheader("📍 Mission Status")
+    # ── Column 1: Mission Status ──
+    with col1:
+        st.subheader("📍 Mission Status")
 
-    # Current phase with emoji
-    phase_emoji = PHASE_EMOJIS.get(obs_data.phase, "❓")
-    phase_display = f"{phase_emoji} {obs_data.phase.replace('_', ' ').title()}"
-    st.markdown(f'<div class="phase-display">{phase_display}</div>', unsafe_allow_html=True)
+        # Current phase with emoji
+        phase_emoji = PHASE_EMOJIS.get(obs_data.phase, "❓")
+        phase_display = f"{phase_emoji} {obs_data.phase.replace('_', ' ').title()}"
+        st.markdown(f'<div class="phase-display">{phase_display}</div>', unsafe_allow_html=True)
 
-    st.metric("Mission Day", f"{obs_data.mission_day} / 300")
-    st.metric("Samples Collected", f"{obs_data.samples_collected} / 3")
-    st.metric("Distance to Target", f"{obs_data.distance_to_target:,.0f} km")
+        st.metric("Mission Day", f"{obs_data.mission_day} / 300")
+        st.metric("Samples Collected", f"{obs_data.samples_collected} / 3")
+        st.metric("Distance to Target", f"{obs_data.distance_to_target:,.0f} km")
 
-    # Success/failure indicator
-    if obs_data.done:
-        if obs_data.success:
-            st.success("🎉 MISSION COMPLETED SUCCESSFULLY!")
-        else:
-            # Determine failure reason
-            if obs_data.fuel <= 0:
-                st.error("💀 MISSION FAILED: Fuel Depleted")
-            elif obs_data.oxygen <= 0:
-                st.error("💀 MISSION FAILED: Oxygen Depleted")
-            elif obs_data.power <= 0:
-                st.error("💀 MISSION FAILED: Power Depleted")
-            elif obs_data.hull_integrity <= 0:
-                st.error("💀 MISSION FAILED: Hull Destroyed")
+        # Success/failure indicator
+        if obs_data.done:
+            if obs_data.success:
+                st.success("🎉 MISSION COMPLETED SUCCESSFULLY!")
             else:
-                st.error("💀 MISSION FAILED")
+                # Determine failure reason
+                if obs_data.fuel <= 0:
+                    st.error("💀 MISSION FAILED: Fuel Depleted")
+                elif obs_data.oxygen <= 0:
+                    st.error("💀 MISSION FAILED: Oxygen Depleted")
+                elif obs_data.power <= 0:
+                    st.error("💀 MISSION FAILED: Power Depleted")
+                elif obs_data.hull_integrity <= 0:
+                    st.error("💀 MISSION FAILED: Hull Destroyed")
+                else:
+                    st.error("💀 MISSION FAILED")
 
-# ── Column 2: Resources ──
-with col2:
-    st.subheader("🔋 Resources")
+    # ── Column 2: Resources ──
+    with col2:
+        st.subheader("🔋 Resources")
 
-    # Fuel gauge
-    fuel_color = "🔴" if obs_data.fuel < 20 else "🟡" if obs_data.fuel < 50 else "🟢"
-    st.progress(obs_data.fuel / 100.0, text=f"{fuel_color} Fuel: {obs_data.fuel:.1f}%")
+        # Fuel gauge
+        fuel_color = "🔴" if obs_data.fuel < 20 else "🟡" if obs_data.fuel < 50 else "🟢"
+        st.progress(obs_data.fuel / 100.0, text=f"{fuel_color} Fuel: {obs_data.fuel:.1f}%")
 
-    # Oxygen gauge
-    oxy_color = "🔴" if obs_data.oxygen < 20 else "🟡" if obs_data.oxygen < 50 else "🟢"
-    st.progress(obs_data.oxygen / 100.0, text=f"{oxy_color} Oxygen: {obs_data.oxygen:.1f}%")
+        # Oxygen gauge
+        oxy_color = "🔴" if obs_data.oxygen < 20 else "🟡" if obs_data.oxygen < 50 else "🟢"
+        st.progress(obs_data.oxygen / 100.0, text=f"{oxy_color} Oxygen: {obs_data.oxygen:.1f}%")
 
-    # Power gauge
-    pwr_color = "🔴" if obs_data.power < 15 else "🟡" if obs_data.power < 30 else "🟢"
-    st.progress(obs_data.power / 100.0, text=f"{pwr_color} Power: {obs_data.power:.1f}%")
+        # Power gauge
+        pwr_color = "🔴" if obs_data.power < 15 else "🟡" if obs_data.power < 30 else "🟢"
+        st.progress(obs_data.power / 100.0, text=f"{pwr_color} Power: {obs_data.power:.1f}%")
 
-    # Hull gauge
-    hull_color = "🔴" if obs_data.hull_integrity < 30 else "🟡" if obs_data.hull_integrity < 60 else "🟢"
-    st.progress(obs_data.hull_integrity / 100.0, text=f"{hull_color} Hull: {obs_data.hull_integrity:.1f}%")
+        # Hull gauge
+        hull_color = "🔴" if obs_data.hull_integrity < 30 else "🟡" if obs_data.hull_integrity < 60 else "🟢"
+        st.progress(obs_data.hull_integrity / 100.0, text=f"{hull_color} Hull: {obs_data.hull_integrity:.1f}%")
 
-# ── Column 3: Events ──
-with col3:
-    st.subheader("⚡ Events")
+    # ── Column 3: Events ──
+    with col3:
+        st.subheader("⚡ Events")
 
-    # Solar storm indicator
-    if obs_data.solar_storm_active:
-        st.markdown('<p class="warning-text">☀️ SOLAR STORM ACTIVE!</p>', unsafe_allow_html=True)
-    else:
-        st.markdown("☀️ Solar Storm: **Clear**")
+        # Solar storm indicator
+        if obs_data.solar_storm_active:
+            st.markdown('<p class="warning-text">☀️ SOLAR STORM ACTIVE!</p>', unsafe_allow_html=True)
+        else:
+            st.markdown("☀️ Solar Storm: **Clear**")
 
-    # Micrometeorite indicator
-    if obs_data.micrometeorite_hit:
-        st.markdown("☄️ Micrometeorite: **IMPACT!**")
-    else:
-        st.markdown("☄️ Micrometeorite: **None**")
+        # Micrometeorite indicator
+        if obs_data.micrometeorite_hit:
+            st.markdown("☄️ Micrometeorite: **IMPACT!**")
+        else:
+            st.markdown("☄️ Micrometeorite: **None**")
 
-    # Communication delay
-    st.metric("Comm Delay", f"{obs_data.communication_delay}s")
+        # Communication delay
+        st.metric("Comm Delay", f"{obs_data.communication_delay}s")
 
-    # Last reward
-    last_reward = st.session_state.rewards[-1] if st.session_state.rewards else 0.0
-    reward_color = "🟢" if last_reward > 0 else "🔴" if last_reward < 0 else "⚪"
-    st.metric("Last Reward", f"{reward_color} {last_reward:.1f}")
+        # Last reward
+        last_reward = st.session_state.rewards[-1] if st.session_state.rewards else 0.0
+        reward_color = "🟢" if last_reward > 0 else "🔴" if last_reward < 0 else "⚪"
+        st.metric("Last Reward", f"{reward_color} {last_reward:.1f}")
 
-    # Total reward
-    st.metric("Total Reward", f"{obs_data.total_reward:.1f}")
+        # Total reward
+        st.metric("Total Reward", f"{obs_data.total_reward:.1f}")
 
-# ── Bottom Section ──
-st.markdown("---")
+    # ── Bottom Section ──
+    st.markdown("---")
 
-# Mission log (last 15 entries in scrollable box)
-st.subheader("📋 Mission Log")
-log_entries = st.session_state.mission_log[-15:]
-log_html = "<div class='log-container'>" + "<br>".join(log_entries) + "</div>"
-st.markdown(log_html, unsafe_allow_html=True)
+    # Mission log (last 15 entries in scrollable box)
+    st.subheader("📋 Mission Log")
+    log_entries = st.session_state.mission_log[-15:]
+    log_html = "<div class='log-container'>" + "<br>".join(log_entries) + "</div>"
+    st.markdown(log_html, unsafe_allow_html=True)
 
-# Reward chart using matplotlib
-if st.session_state.reward_history:
-    st.subheader("📈 Reward Progress Over Time")
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(st.session_state.reward_history, color='#00ff88', linewidth=2)
-    ax.set_xlabel('Steps', color='#e0e0e0')
-    ax.set_ylabel('Reward', color='#e0e0e0')
-    ax.set_title('Reward Progress Over Time', color='#e0e0e0')
-    ax.grid(True, alpha=0.3, color='#4444aa')
-    ax.tick_params(colors='#e0e0e0')
-    ax.spines['bottom'].set_color('#4444aa')
-    ax.spines['top'].set_color('#4444aa')
-    ax.spines['left'].set_color('#4444aa')
-    ax.spines['right'].set_color('#4444aa')
-    fig.patch.set_facecolor('#0a0a2e')
-    ax.set_facecolor('#0a0a2e')
-    st.pyplot(fig)
+    # Reward chart using matplotlib
+    if st.session_state.reward_history:
+        st.subheader("📈 Reward Progress Over Time")
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(st.session_state.reward_history, color='#00ff88', linewidth=2)
+        ax.set_xlabel('Steps', color='#e0e0e0')
+        ax.set_ylabel('Reward', color='#e0e0e0')
+        ax.set_title('Reward Progress Over Time', color='#e0e0e0')
+        ax.grid(True, alpha=0.3, color='#4444aa')
+        ax.tick_params(colors='#e0e0e0')
+        ax.spines['bottom'].set_color('#4444aa')
+        ax.spines['top'].set_color('#4444aa')
+        ax.spines['left'].set_color('#4444aa')
+        ax.spines['right'].set_color('#4444aa')
+        fig.patch.set_facecolor('#0a0a2e')
+        ax.set_facecolor('#0a0a2e')
+        st.pyplot(fig)
