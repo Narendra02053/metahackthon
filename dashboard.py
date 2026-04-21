@@ -141,18 +141,41 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+def close_environment():
+    """Close the environment connection to free up server capacity."""
+    if "env" in st.session_state:
+        try:
+            st.session_state.env.__exit__(None, None, None)
+            del st.session_state.env
+        except Exception as e:
+            print(f"Error closing environment: {e}")
+
+
 def init_session_state():
     """Initialize Streamlit session state variables on first load."""
+    # Reuse existing environment instance if available
     if "env" not in st.session_state:
-        st.session_state.env = AstroEnvClient(base_url=BASE_URL).sync()
-        st.session_state.env.__enter__()  # open the sync client context
+        try:
+            st.session_state.env = AstroEnvClient(base_url=BASE_URL).sync()
+            st.session_state.env.__enter__()  # open the sync client context
+        except Exception as e:
+            st.error(f"Could not create environment connection: {e}")
+            st.stop()
 
+    # Reset observation (reuse existing connection)
     if "obs" not in st.session_state:
         try:
             st.session_state.obs = st.session_state.env.reset()
         except Exception as e:
-            st.error(f"Could not connect to server at {BASE_URL}: {e}")
-            st.stop()
+            # If reset fails, try to close and recreate the connection
+            close_environment()
+            try:
+                st.session_state.env = AstroEnvClient(base_url=BASE_URL).sync()
+                st.session_state.env.__enter__()
+                st.session_state.obs = st.session_state.env.reset()
+            except Exception as e2:
+                st.error(f"Could not connect to server at {BASE_URL}: {e2}")
+                st.stop()
 
     if "mission_log" not in st.session_state:
         st.session_state.mission_log = [
