@@ -1,12 +1,27 @@
 from groq import Groq
 import os
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load API key from .env file manually
+api_key = None
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(env_path):
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("GROQ_API_KEY="):
+                api_key = line.strip().split("=", 1)[1]
+                break
 
-# Initialize Groq client
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+# Fallback to environment variable
+if not api_key:
+    api_key = os.environ.get("GROQ_API_KEY")
+
+# Initialize Groq client only if API key is available
+client = None
+if api_key:
+    try:
+        client = Groq(api_key=api_key)
+    except Exception:
+        client = None
 
 VALID_ACTIONS = [
     "fire_thruster",
@@ -60,6 +75,11 @@ def get_llm_action(obs) -> str:
     Returns:
         action string — one of the 6 valid actions
     """
+    
+    # If Groq client is not available, use fallback immediately
+    if client is None:
+        print("  ⚠️ Groq API key not set, using rule-based fallback")
+        return _safe_fallback(obs)
     
     # Build detailed state description for LLM
     user_message = f"""

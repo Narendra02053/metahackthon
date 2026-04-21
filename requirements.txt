@@ -1,0 +1,15 @@
+openenv-core
+fastapi
+uvicorn[standard]
+pydantic>=2.0
+streamlit
+numpy
+torch
+trl
+transformers
+matplotlib
+requests
+groq
+python-dotenv
+altair
+pandas
